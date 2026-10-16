@@ -25,8 +25,8 @@ docker compose ps
 
 ## Dịch vụ
 
-| Dịch vụ               | Địa chỉ từ máy local |
-
+| Dịch vụ | Địa chỉ từ máy local |
+| --- | --- |
 | Website/API qua Nginx | <http://localhost:8080> |
 | phpMyAdmin            | <http://localhost:8081> |
 | Prometheus            | <http://localhost:9090> |
@@ -37,21 +37,21 @@ MySQL, Express và các exporter chỉ truy cập nội bộ qua Docker networks
 
 ## API
 
-| Method| Endpoint             | Chức năng |
+| Method | Endpoint | Chức năng |
+| --- | --- | --- |
+| GET | `/health` | Kiểm tra API |
+| GET | `/health/db` | Kiểm tra kết nối MySQL |
+| GET | `/api/categories` | Liệt kê danh mục |
+| POST | `/api/categories` | Tạo danh mục với JSON `{"name":"Công nghệ"}` |
+| GET | `/api/episodes` | Liệt kê tập và danh mục |
+| GET | `/api/episodes/:id` | Chi tiết tập |
+| POST | `/api/episodes` | Tạo tập; nhận `title`, `description`, `audio_url`, `category_id` |
+| GET | `/metrics` | Metrics cho Prometheus |
 
-| GET   | `/health`             | Kiểm tra API |
-| GET   | `/health/db`          | Kiểm tra kết nối MySQL |
-| GET   | `/api/categories`     | Liệt kê danh mục |
-| POST  | `/api/categories`     | Tạo danh mục với JSON `{"name":"Công nghệ"}` |
-| GET   | `/api/episodes`       | Liệt kê tập và danh mục |
-| GET   | `/api/episodes/:id`   | Chi tiết tập |
-| POST  | `/api/episodes`       | Tạo tập; nhận `title`, `description`, `audio_url`, `category_id` |
-| GET   | `/metrics`            | Metrics cho Prometheus |
-
-Audio preview dùng URL audio trực tiếp, ví dụ MP3/stream URL truy cập được từ trình duyệt. Tạo tập mẫu:
+Audio preview dùng URL audio trực tiếp, ví dụ MP3/stream URL truy cập được từ trình duyệt. Thay `URL_MP3_HOP_LE` bằng URL audio bạn có quyền sử dụng:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/episodes' -ContentType 'application/json' -Body '{"title":"Demo episode","description":"Example","category_id":1,"audio_url":"https://example.com/audio.mp3"}'
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/episodes' -ContentType 'application/json' -Body '{"title":"Demo episode","description":"Example","category_id":1,"audio_url":"URL_MP3_HOP_LE"}'
 ```
 
 ## Monitoring và logs
@@ -89,13 +89,15 @@ cAdvisor cần quyền cao để đọc metrics container; Promtail cần Docker
 
 ## GitHub
 
-Tạo repository GitHub với tên theo mã sinh viên. Thay `YOUR_STUDENT_ID` bằng mã sinh viên của bạn rồi chạy tại thư mục gốc:
+Repository: <https://github.com/DTC245200910/DTC245200910-PodcastMedia>
+
+Để push các cập nhật tiếp theo từ thư mục gốc:
 
 ```powershell
-git add .
-git commit -m "Build podcast media deployment and monitoring stack"
-git remote add origin https://github.com/YOUR_STUDENT_ID/podcast-media.git
-git push -u origin main
+git add README.md screenshots/
+git diff --cached --check
+git commit -m "docs: bổ sung minh chứng triển khai và giám sát"
+git push
 ```
 
 ## Minh chứng
