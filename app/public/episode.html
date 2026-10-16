@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chi tiết tập | Podcast Media</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.6 system-ui, sans-serif; color: #17272b; background: #f5f7f5; }
+    * { box-sizing: border-box; }
+    body { max-width: 820px; margin: 48px auto; padding: 0 20px; }
+    a { color: #176b68; }
+    article { margin-top: 28px; padding-top: 20px; border-top: 3px solid #ef674f; }
+    h1 { line-height: 1.2; }
+    .categories, time, #status { color: #526366; }
+    audio { display: block; width: 100%; margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <a href="/">&larr; Tất cả tập</a>
+  <article id="episode" aria-live="polite">
+    <p id="status">Đang tải tập podcast...</p>
+  </article>
+
+  <script>
+    const episodeElement = document.querySelector('#episode');
+    const episodeId = new URLSearchParams(window.location.search).get('id');
+
+    async function loadEpisode() {
+      if (!episodeId || !/^\d+$/.test(episodeId)) {
+        throw new Error('ID tập podcast không hợp lệ.');
+      }
+
+      const response = await fetch(`/api/episodes/${encodeURIComponent(episodeId)}`);
+      const episode = await response.json();
+      if (!response.ok) throw new Error(episode.error || 'Không tải được tập podcast.');
+
+      episodeElement.replaceChildren();
+      const heading = document.createElement('h1');
+      heading.textContent = episode.title;
+      episodeElement.append(heading);
+
+      if (episode.categories.length) {
+        const category = document.createElement('p');
+        category.className = 'categories';
+        category.textContent = episode.categories.map((item) => item.name).join(', ');
+        episodeElement.append(category);
+      }
+
+      if (episode.description) {
+        const description = document.createElement('p');
+        description.textContent = episode.description;
+        episodeElement.append(description);
+      }
+
+      if (episode.audio_url) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.preload = 'metadata';
+        audio.src = episode.audio_url;
+        audio.setAttribute('aria-label', `Nghe thử ${episode.title}`);
+        episodeElement.append(audio);
+      } else {
+        const notice = document.createElement('p');
+        notice.id = 'status';
+        notice.textContent = 'Tập này chưa có đường dẫn audio.';
+        episodeElement.append(notice);
+      }
+
+      const date = document.createElement('time');
+      date.dateTime = episode.created_at;
+      date.textContent = new Date(episode.created_at).toLocaleString('vi-VN');
+      episodeElement.append(date);
+      document.title = `${episode.title} | Podcast Media`;
+    }
+
+    loadEpisode().catch((error) => {
+      const status = document.querySelector('#status');
+      status.textContent = error.message;
+    });
+  </script>
+</body>
+</html>

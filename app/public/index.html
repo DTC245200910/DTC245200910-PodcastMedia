@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Podcast Media</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #17272b; background: #f5f7f5; }
+    * { box-sizing: border-box; }
+    body { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    header { padding: 12px 0 20px; border-bottom: 3px solid #ef674f; }
+    h1 { margin: 0; }
+    header p { margin: 4px 0 0; color: #526366; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 40px; padding-top: 24px; }
+    .toolbar, form { display: grid; gap: 10px; }
+    .toolbar { grid-template-columns: 1fr 220px; align-items: center; margin-bottom: 12px; }
+    input, textarea, select, button { width: 100%; padding: 10px; font: inherit; }
+    textarea { min-height: 90px; resize: vertical; }
+    button { border: 0; background: #ef674f; color: #fff; cursor: pointer; }
+    button:hover { background: #d94f3a; }
+    article { padding: 16px 0; border-bottom: 1px solid #ccd5d4; }
+    article h3 { margin: 0; }
+    a { color: #176b68; }
+    .categories { color: #526366; font-size: .9rem; }
+    aside section + section { margin-top: 28px; }
+    audio { display: block; width: 100%; margin-top: 10px; }
+    [role="status"] { min-height: 1.5em; }
+    @media (max-width: 720px) {
+      body { margin-top: 20px; }
+      main { grid-template-columns: 1fr; gap: 20px; }
+      .toolbar { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Podcast Media</h1>
+    <p>Thư viện tập podcast và audio</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="episodes-heading">
+      <div class="toolbar">
+        <h2 id="episodes-heading">Các tập</h2>
+        <select id="category-filter" aria-label="Lọc theo danh mục">
+          <option value="">Tất cả danh mục</option>
+        </select>
+      </div>
+      <div id="episodes" aria-live="polite">Đang tải...</div>
+    </section>
+
+    <aside>
+      <section aria-labelledby="category-heading">
+        <h2 id="category-heading">Thêm danh mục</h2>
+        <form id="category-form">
+          <input name="name" maxlength="80" placeholder="Tên danh mục" required>
+          <button type="submit">Tạo danh mục</button>
+        </form>
+        <p id="category-message" role="status"></p>
+      </section>
+
+      <section aria-labelledby="episode-heading">
+        <h2 id="episode-heading">Thêm tập</h2>
+        <form id="episode-form">
+          <input name="title" maxlength="200" placeholder="Tên tập" required>
+          <textarea name="description" placeholder="Mô tả"></textarea>
+          <select name="category_id" id="episode-category" aria-label="Danh mục"></select>
+          <input name="audio_url" type="url" placeholder="Đường dẫn audio (không bắt buộc)">
+          <button type="submit">Thêm tập</button>
+        </form>
+        <p id="episode-message" role="status"></p>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const episodesElement = document.querySelector('#episodes');
+    const categoryFilter = document.querySelector('#category-filter');
+    const episodeCategory = document.querySelector('#episode-category');
+    const categoryMessage = document.querySelector('#category-message');
+    const episodeMessage = document.querySelector('#episode-message');
+    let episodes = [];
+
+    async function loadCategories() {
+      const response = await fetch('/api/categories');
+      if (!response.ok) throw new Error('Could not load categories');
+      const categories = await response.json();
+
+      categoryFilter.replaceChildren(new Option('Tất cả danh mục', ''));
+      episodeCategory.replaceChildren(new Option('Chọn danh mục', ''));
+      for (const category of categories) {
+        categoryFilter.add(new Option(category.name, category.id));
+        episodeCategory.add(new Option(category.name, category.id));
+      }
+    }
+
+    async function loadEpisodes() {
+      const response = await fetch('/api/episodes');
+      if (!response.ok) throw new Error('Could not load episodes');
+      episodes = await response.json();
+      renderEpisodes();
+    }
+
+    function renderEpisodes() {
+      const selectedCategory = categoryFilter.value;
+      const filteredEpisodes = episodes.filter((episode) =>
+        !selectedCategory || episode.categories.some((category) => String(category.id) === selectedCategory)
+      );
+
+      episodesElement.replaceChildren();
+      if (!filteredEpisodes.length) {
+        episodesElement.textContent = 'Chưa có tập podcast trong danh mục này.';
+        return;
+      }
+
+      for (const episode of filteredEpisodes) {
+        const article = document.createElement('article');
+        const title = document.createElement('h3');
+        const link = document.createElement('a');
+        link.href = `/episode.html?id=${encodeURIComponent(episode.id)}`;
+        link.textContent = episode.title;
+        title.append(link);
+        article.append(title);
+
+        const categoryNames = episode.categories.map((category) => category.name).join(', ');
+        if (categoryNames) {
+          const categoryLine = document.createElement('p');
+          categoryLine.className = 'categories';
+          categoryLine.textContent = categoryNames;
+          article.append(categoryLine);
+        }
+
+        if (episode.description) {
+          const description = document.createElement('p');
+          description.textContent = episode.description;
+          article.append(description);
+        }
+        episodesElement.append(article);
+      }
+    }
+
+    categoryFilter.addEventListener('change', renderEpisodes);
+
+    document.querySelector('#category-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.get('name') }),
+      });
+      const result = await response.json();
+      categoryMessage.textContent = response.ok ? 'Đã tạo danh mục.' : result.error;
+      if (response.ok) {
+        event.currentTarget.reset();
+        await loadCategories();
+      }
+    });
+
+    document.querySelector('#episode-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const response = await fetch('/api/episodes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.get('title'),
+          description: form.get('description') || null,
+          audio_url: form.get('audio_url') || null,
+          category_id: form.get('category_id') || null,
+        }),
+      });
+      const result = await response.json();
+      episodeMessage.textContent = response.ok ? 'Đã thêm tập.' : result.error;
+      if (response.ok) {
+        event.currentTarget.reset();
+        await loadEpisodes();
+      }
+    });
+
+    Promise.all([loadCategories(), loadEpisodes()]).catch(() => {
+      episodesElement.textContent = 'Không tải được dữ liệu podcast.';
+    });
+  </script>
+</body>
+</html>
