@@ -118,9 +118,14 @@ git push -u origin main
 
 ### phpMyAdmin
 
-![phpMyAdmin login page](screenshots/phpmyadmin-login.png)
+![phpMyAdmin database tables](screenshots/phpmyadmin-tables-evidence.png)
 
-Trước khi nộp, bổ sung ảnh Grafana dashboard, phpMyAdmin đã đăng nhập, và truy vấn LogQL đang trả về log container.
+### Loki LogQL
+
+![LogQL query results](screenshots/logql-query-evidence.png)
+
+### Grafana dashboard
+![Podcast observability dashboard](screenshots/grafana-dashboard.png)
 
 ## Dừng dịch vụ
 
