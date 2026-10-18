@@ -109,6 +109,31 @@ async function getEpisodeRows(episodeId) {
   return [...episodes.values()];
 }
 
+async function findDuplicateEpisode(title, audioUrl, excludeId) {
+  const checks = ['LOWER(TRIM(title)) = LOWER(TRIM(?))'];
+  const values = [title];
+
+  if (audioUrl) {
+    checks.push('audio_url = ?');
+    values.push(audioUrl);
+  }
+  if (excludeId !== undefined) {
+    values.push(excludeId);
+  }
+
+  const exclusion = excludeId === undefined ? '' : ' AND id <> ?';
+  const [rows] = await db.execute(
+    `SELECT id FROM episodes WHERE (${checks.join(' OR ')})${exclusion} LIMIT 1`,
+    values
+  );
+  return rows[0] || null;
+}
+
+function parsePositiveId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 app.use(express.json());
 
 app.use((request, response, next) => {
@@ -189,6 +214,56 @@ app.post('/api/categories', async (request, response) => {
   }
 });
 
+app.put('/api/categories/:id', async (request, response) => {
+  const categoryId = parsePositiveId(request.params.id);
+  const name = typeof request.body.name === 'string' ? request.body.name.trim() : '';
+
+  if (!categoryId) {
+    return response.status(400).json({ error: 'Invalid category id' });
+  }
+  if (!name || name.length > 80) {
+    return response.status(400).json({ error: 'name must contain 1 to 80 characters' });
+  }
+
+  try {
+    const [result] = await db.execute(
+      'UPDATE categories SET name = ? WHERE id = ?',
+      [name, categoryId]
+    );
+    if (!result.affectedRows) {
+      return response.status(404).json({ error: 'Category not found' });
+    }
+    response.json({ id: categoryId, name });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return response.status(409).json({ error: 'Category already exists' });
+    }
+    console.error(error);
+    response.status(500).json({ error: 'Could not update category' });
+  }
+});
+
+app.delete('/api/categories/:id', async (request, response) => {
+  const categoryId = parsePositiveId(request.params.id);
+  if (!categoryId) {
+    return response.status(400).json({ error: 'Invalid category id' });
+  }
+
+  try {
+    const [result] = await db.execute(
+      'DELETE FROM categories WHERE id = ?',
+      [categoryId]
+    );
+    if (!result.affectedRows) {
+      return response.status(404).json({ error: 'Category not found' });
+    }
+    response.status(204).end();
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: 'Could not delete category' });
+  }
+});
+
 app.get('/api/episodes', async (_request, response) => {
   try {
     const episodes = await getEpisodeRows();
@@ -200,8 +275,8 @@ app.get('/api/episodes', async (_request, response) => {
 });
 
 app.get('/api/episodes/:id', async (request, response) => {
-  const episodeId = Number(request.params.id);
-  if (!Number.isSafeInteger(episodeId) || episodeId < 1) {
+  const episodeId = parsePositiveId(request.params.id);
+  if (!episodeId) {
     return response.status(400).json({ error: 'Invalid episode id' });
   }
 
@@ -218,17 +293,35 @@ app.get('/api/episodes/:id', async (request, response) => {
 });
 
 app.post('/api/episodes', async (request, response) => {
-  const { title, description = null, audio_url = null } = request.body;
+  const title = typeof request.body.title === 'string' ? request.body.title.trim() : '';
+  const description = typeof request.body.description === 'string'
+    ? request.body.description.trim() || null
+    : null;
+  const audioUrl = typeof request.body.audio_url === 'string'
+    ? request.body.audio_url.trim() || null
+    : null;
   const rawCategoryId = request.body.category_id;
   const categoryId = rawCategoryId === undefined || rawCategoryId === null || rawCategoryId === ''
     ? null
     : Number(rawCategoryId);
 
-  if (typeof title !== 'string' || !title.trim()) {
-    return response.status(400).json({ error: 'title is required' });
+  if (!title || title.length > 200) {
+    return response.status(400).json({ error: 'title must contain 1 to 200 characters' });
+  }
+  if (audioUrl && audioUrl.length > 500) {
+    return response.status(400).json({ error: 'audio_url cannot exceed 500 characters' });
   }
   if (categoryId !== null && (!Number.isSafeInteger(categoryId) || categoryId < 1)) {
     return response.status(400).json({ error: 'Invalid category_id' });
+  }
+
+  try {
+    if (await findDuplicateEpisode(title, audioUrl)) {
+      return response.status(409).json({ error: 'Episode title or audio URL already exists' });
+    }
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: 'Could not check for duplicate episodes' });
   }
 
   const connection = await db.getConnection();
@@ -236,7 +329,7 @@ app.post('/api/episodes', async (request, response) => {
     await connection.beginTransaction();
     const [result] = await connection.execute(
       'INSERT INTO episodes (title, description, audio_url) VALUES (?, ?, ?)',
-      [title.trim(), description, audio_url]
+      [title, description, audioUrl]
     );
 
     if (categoryId !== null) {
@@ -249,9 +342,9 @@ app.post('/api/episodes', async (request, response) => {
 
     response.status(201).json({
       id: result.insertId,
-      title: title.trim(),
+      title,
       description,
-      audio_url,
+      audio_url: audioUrl,
       category_id: categoryId,
     });
   } catch (error) {
@@ -263,6 +356,99 @@ app.post('/api/episodes', async (request, response) => {
     response.status(500).json({ error: 'Could not create episode' });
   } finally {
     connection.release();
+  }
+});
+
+app.put('/api/episodes/:id', async (request, response) => {
+  const episodeId = parsePositiveId(request.params.id);
+  const title = typeof request.body.title === 'string' ? request.body.title.trim() : '';
+  const description = typeof request.body.description === 'string'
+    ? request.body.description.trim() || null
+    : null;
+  const audioUrl = typeof request.body.audio_url === 'string'
+    ? request.body.audio_url.trim() || null
+    : null;
+  const rawCategoryId = request.body.category_id;
+  const categoryId = rawCategoryId === undefined || rawCategoryId === null || rawCategoryId === ''
+    ? null
+    : Number(rawCategoryId);
+
+  if (!episodeId) {
+    return response.status(400).json({ error: 'Invalid episode id' });
+  }
+  if (!title || title.length > 200) {
+    return response.status(400).json({ error: 'title must contain 1 to 200 characters' });
+  }
+  if (audioUrl && audioUrl.length > 500) {
+    return response.status(400).json({ error: 'audio_url cannot exceed 500 characters' });
+  }
+  if (categoryId !== null && (!Number.isSafeInteger(categoryId) || categoryId < 1)) {
+    return response.status(400).json({ error: 'Invalid category_id' });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    const [existingRows] = await connection.execute(
+      'SELECT id FROM episodes WHERE id = ?',
+      [episodeId]
+    );
+    if (!existingRows.length) {
+      return response.status(404).json({ error: 'Episode not found' });
+    }
+
+    if (await findDuplicateEpisode(title, audioUrl, episodeId)) {
+      return response.status(409).json({ error: 'Episode title or audio URL already exists' });
+    }
+
+    await connection.beginTransaction();
+    await connection.execute(
+      'UPDATE episodes SET title = ?, description = ?, audio_url = ? WHERE id = ?',
+      [title, description, audioUrl, episodeId]
+    );
+    await connection.execute(
+      'DELETE FROM episode_categories WHERE episode_id = ?',
+      [episodeId]
+    );
+    if (categoryId !== null) {
+      await connection.execute(
+        'INSERT INTO episode_categories (episode_id, category_id) VALUES (?, ?)',
+        [episodeId, categoryId]
+      );
+    }
+    await connection.commit();
+
+    const [episode] = await getEpisodeRows(episodeId);
+    response.json(episode);
+  } catch (error) {
+    await connection.rollback();
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return response.status(400).json({ error: 'Category not found' });
+    }
+    console.error(error);
+    response.status(500).json({ error: 'Could not update episode' });
+  } finally {
+    connection.release();
+  }
+});
+
+app.delete('/api/episodes/:id', async (request, response) => {
+  const episodeId = parsePositiveId(request.params.id);
+  if (!episodeId) {
+    return response.status(400).json({ error: 'Invalid episode id' });
+  }
+
+  try {
+    const [result] = await db.execute(
+      'DELETE FROM episodes WHERE id = ?',
+      [episodeId]
+    );
+    if (!result.affectedRows) {
+      return response.status(404).json({ error: 'Episode not found' });
+    }
+    response.status(204).end();
+  } catch (error) {
+    console.error(error);
+    response.status(500).json({ error: 'Could not delete episode' });
   }
 });
 
