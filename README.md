@@ -1,15 +1,35 @@
 # Podcast Media
-
 Website Podcast/Media Library dùng Express, MySQL và Docker Compose. Nginx làm reverse proxy; Prometheus/Grafana thu thập và hiển thị metrics; Loki/Promtail tập trung log.
 
 ## Yêu cầu
-
 - Docker Desktop đang chạy ở chế độ Linux containers
 - Docker Compose v2
 
 ## Cấu hình môi trường
-
 Sao chép `.env.example` thành `.env`, sau đó thay các giá trị mẫu bằng mật khẩu riêng, mạnh và không dùng lại giữa các dịch vụ. Không commit `.env` lên GitHub.
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Ví dụ nội dung `.env` (bạn cần thay các giá trị mẫu bằng mật khẩu thực):
+
+```env
+MYSQL_ROOT_PASSWORD=thay-the-bang-mat-khau-root-manh
+MYSQL_DATABASE=podcast_media
+MYSQL_USER=podcast_user
+MYSQL_PASSWORD=thay-the-bang-mat-khau-app-manh
+MYSQL_EXPORTER_PASSWORD=thay-the-bang-mat-khau-exporter-manh
+GRAFANA_ADMIN_PASSWORD=thay-the-bang-mat-khau-grafana-manh
+```
+
+Nếu bạn clone repo trên Windows và gặp lỗi `set: invalid option` khi khởi động Docker, hãy chuyển file `mysql/create-exporter-user.sh` về định dạng LF (không phải CRLF):
+
+```powershell
+git config --global core.autocrlf input
+# hoặc trong VS Code: chọn file -> Convert End of Line Sequence -> LF
+```
 
 ## Khởi chạy
 
@@ -22,6 +42,23 @@ docker compose ps
 ```
 
 Ứng dụng tự tạo bảng `categories` và quan hệ `episode_categories` khi khởi động. Dữ liệu được giữ trong named volumes.
+
+## Clone từ GitHub trên máy mới
+
+Nếu là người mới clone repo từ `main` về máy mới, thực hiện theo thứ tự sau:
+
+```powershell
+git clone <repo-url>
+cd <repo-folder>
+Copy-Item .env.example .env
+notepad .env
+# thay các giá trị mẫu bằng mật khẩu thật
+# nếu chạy trên Windows, đổi file mysql/create-exporter-user.sh sang LF
+
+docker compose up -d --build
+```
+
+Nếu không tạo `.env` hoặc còn CRLF trong script shell, container `mysql-exporter-bootstrap` sẽ fail và Docker compose sẽ trả về lỗi khởi động.
 
 ## Dịch vụ
 
