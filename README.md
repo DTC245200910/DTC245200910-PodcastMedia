@@ -43,12 +43,18 @@ MySQL, Express và các exporter chỉ truy cập nội bộ qua Docker networks
 | GET | `/health/db` | Kiểm tra kết nối MySQL |
 | GET | `/api/categories` | Liệt kê danh mục |
 | POST | `/api/categories` | Tạo danh mục với JSON `{"name":"Công nghệ"}` |
+| PUT | `/api/categories/:id` | Đổi tên danh mục; tên đã tồn tại bị từ chối |
+| DELETE | `/api/categories/:id` | Xóa danh mục và liên kết; không xóa các tập |
 | GET | `/api/episodes` | Liệt kê tập và danh mục |
 | GET | `/api/episodes/:id` | Chi tiết tập |
 | POST | `/api/episodes` | Tạo tập; nhận `title`, `description`, `audio_url`, `category_id` |
+| PUT | `/api/episodes/:id` | Sửa tập và danh mục |
+| DELETE | `/api/episodes/:id` | Xóa tập |
 | GET | `/metrics` | Metrics cho Prometheus |
 
-Audio preview dùng URL audio trực tiếp, ví dụ MP3/stream URL truy cập được từ trình duyệt. Thay `URL_MP3_HOP_LE` bằng URL audio bạn có quyền sử dụng:
+API từ chối danh mục trùng tên, tập trùng tiêu đề (không phân biệt hoa/thường) hoặc trùng URL audio với HTTP `409`. Các bản ghi trùng đã tồn tại từ trước được giữ nguyên; việc thêm chức năng này không tự xóa dữ liệu cũ.
+
+Audio preview hỗ trợ URL file/stream audio truy cập được từ trình duyệt và URL video YouTube cụ thể (`youtube.com/watch?v=...`, `youtu.be/...`). Link trang tìm kiếm YouTube không phát được; hãy mở một video rồi dùng URL của video đó. Chỉ sử dụng nội dung bạn có quyền phát. Thay `URL_MP3_HOP_LE` bên dưới bằng URL audio trực tiếp hợp lệ:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/episodes' -ContentType 'application/json' -Body '{"title":"Demo episode","description":"Example","category_id":1,"audio_url":"URL_MP3_HOP_LE"}'
