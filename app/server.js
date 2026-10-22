@@ -60,7 +60,7 @@ async function initializeDatabase() {
 
   await db.query(`
     INSERT IGNORE INTO categories (name)
-    VALUES ('Trò chuyện'), ('Công nghệ'), ('Văn hóa')
+    VALUES ('Trò chuyện'), ('Văn hóa'), ('Âm Nhạc'), ('Rap')
   `);
 }
 
@@ -78,7 +78,7 @@ async function getEpisodeRows(episodeId) {
     LEFT JOIN episode_categories ec ON ec.episode_id = e.id
     LEFT JOIN categories c ON c.id = ec.category_id
     ${episodeId === undefined ? '' : 'WHERE e.id = ?'}
-    ORDER BY e.created_at DESC, c.name ASC
+    ORDER BY e.created_at DESC, e.id DESC, c.name ASC
   `;
 
   const [rows] = episodeId === undefined

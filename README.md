@@ -32,7 +32,6 @@ git config --global core.autocrlf input
 ```
 
 ## Khởi chạy
-
 Chạy tại thư mục gốc:
 
 ```powershell
@@ -41,10 +40,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Ứng dụng tự tạo bảng `categories` và quan hệ `episode_categories` khi khởi động. Dữ liệu được giữ trong named volumes.
+Khi MySQL khởi tạo volume mới, `mysql/init.sql` tạo bảng và seed sẵn 10 tập mẫu cùng 4 danh mục theo thư viện minh họa. App cũng bảo đảm các danh mục và quan hệ `episode_categories` tồn tại khi khởi động. Dữ liệu được giữ trong named volumes; MySQL không chạy lại `init.sql` trên volume đã có dữ liệu.
 
 ## Clone từ GitHub trên máy mới
-
 Nếu là người mới clone repo từ `main` về máy mới, thực hiện theo thứ tự sau:
 
 ```powershell
@@ -61,7 +59,6 @@ docker compose up -d --build
 Nếu không tạo `.env` hoặc còn CRLF trong script shell, container `mysql-exporter-bootstrap` sẽ fail và Docker compose sẽ trả về lỗi khởi động.
 
 ## Dịch vụ
-
 | Dịch vụ | Địa chỉ từ máy local |
 | --- | --- |
 | Website/API qua Nginx | <http://localhost:8080> |
